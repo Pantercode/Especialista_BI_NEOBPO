@@ -1,0 +1,93 @@
+-- Mudar o contexto para o banco de dados CASE_NEOBPO
+USE CASE_NEOBPO;
+GO
+
+-- Criar um procedimento armazenado chamado sp_Despesas_Detalhadas
+CREATE PROCEDURE sp_Despesas_Detalhadas
+    @DTBASE DATE,
+    @CODIGOCENTROCUSTO INT,
+    @CENTROCUSTOMASTER INT,
+    @VLDESPESA DECIMAL(18, 2),
+    @CODFILIALPRINCIPAL INT,
+    @CODCONTA INT,
+    @MES_A DATE
+AS
+BEGIN
+    -- Impedir a contagem de mensagens de retorno
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        -- Iniciar uma transação
+        BEGIN TRANSACTION;
+
+        -- Verifica se o registro já existe
+        IF EXISTS (SELECT 1
+                   FROM DESPESA_DETALHADA
+                   WHERE CODIGOCENTROCUSTO = @CODIGOCENTROCUSTO)
+        BEGIN
+            -- Atualiza o registro existente
+            UPDATE DESPESA_DETALHADA
+            SET DTBASE = @DTBASE,
+                CENTROCUSTOMASTER = @CENTROCUSTOMASTER,
+                VLDESPESA = @VLDESPESA,
+                CODFILIALPRINCIPAL = @CODFILIALPRINCIPAL,
+                CODCONTA = @CODCONTA,
+                MES_A = @MES_A
+            WHERE CODIGOCENTROCUSTO = @CODIGOCENTROCUSTO;
+        END
+        ELSE
+        BEGIN
+            -- Insere um novo registro
+            INSERT INTO DESPESA_DETALHADA (DTBASE, CODIGOCENTROCUSTO, CENTROCUSTOMASTER, VLDESPESA, CODFILIALPRINCIPAL, CODCONTA, MES_A)
+            VALUES (@DTBASE, @CODIGOCENTROCUSTO, @CENTROCUSTOMASTER, @VLDESPESA, @CODFILIALPRINCIPAL, @CODCONTA, @MES_A);
+        END
+
+        -- Confirmar a transação
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        -- Tratamento de erros
+        IF @@TRANCOUNT > 0
+        BEGIN
+            -- Reverter a transação em caso de erro
+            ROLLBACK TRANSACTION;
+        END
+
+        -- Declarar variáveis para armazenar informações sobre o erro
+        DECLARE @ErrorMessage NVARCHAR(4000);
+        DECLARE @ErrorSeverity INT;
+        DECLARE @ErrorState INT;
+
+        -- Obter informações sobre o erro
+        SELECT @ErrorMessage = ERROR_MESSAGE(),
+               @ErrorSeverity = ERROR_SEVERITY(),
+               @ErrorState = ERROR_STATE();
+
+        -- Levantar o erro com as informações obtidas
+        RAISERROR (@ErrorMessage, @ErrorSeverity, @ErrorState);
+    END CATCH
+END;
+GO
+
+-- Teste 1 
+EXEC sp_Despesas_Detalhadas 
+    @DTBASE = '2023-06-30', 
+    @CODIGOCENTROCUSTO = 101, 
+    @CENTROCUSTOMASTER = 1, 
+    @VLDESPESA = 500.00, 
+    @CODFILIALPRINCIPAL = 2, 
+    @CODCONTA = 3001, 
+    @MES_A = '2023-06-01';
+
+-- Teste 2
+EXEC sp_Despesas_Detalhadas
+    @DTBASE = '2024-06-30', 
+    @CODIGOCENTROCUSTO = 202, 
+    @CENTROCUSTOMASTER = 2, 
+    @VLDESPESA = 750.00, 
+    @CODFILIALPRINCIPAL = 3, 
+    @CODCONTA = 4002, 
+    @MES_A = '2024-06-01';
+
+-- Selecionar a contagem de registros na tabela DESPESA_DETALHADA
+SELECT COUNT(*) FROM DESPESA_DETALHADA;
